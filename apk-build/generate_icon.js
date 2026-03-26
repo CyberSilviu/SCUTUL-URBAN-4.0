@@ -10,7 +10,7 @@ const svg = `<svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}"
   <rect width="${SIZE}" height="${SIZE}" fill="#ffffff" rx="200"/>
 
   <!-- Shield centrat, scalat la ~700px -->
-  <g transform="translate(162, 112) scale(7)">
+  <g transform="translate(162, 140) scale(7)">
     <path d="M50 5L10 20V45c0 22 15.6 43 40 50 24.4-7 40-28 40-50V20L50 5z"
       fill="rgba(37,99,235,0.15)" stroke="#2563eb" stroke-width="2"/>
     <path d="M50 18L22 28.5V45c0 14 8.4 27.2 28 33 19.6-5.8 28-19 28-33V28.5L50 18z"

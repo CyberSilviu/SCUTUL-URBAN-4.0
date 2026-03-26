@@ -200,7 +200,7 @@
     <p class="app-desc">Platformă integrată pentru siguranța cetățenilor — monitorizare seismică și calitate aer în timp real.</p>
 
     <div class="buttons">
-      <button class="app-btn seismic" onclick="openModule('https://seismicwatch.netlify.app/', 'SeismicWatch', 'scaled')">
+      <button class="app-btn seismic" onclick="openModule('https://seismicwatch.netlify.app/', 'scaled')">
         <div class="btn-icon">🌍</div>
         <div class="btn-text">
           <span class="btn-label">SeismicWatch</span>
@@ -211,7 +211,7 @@
         </svg>
       </button>
 
-      <button class="app-btn air" onclick="openModule('https://statie-calitate-aer.netlify.app/', 'Stație Calitate Aer', 'normal')">
+      <button class="app-btn air" onclick="openModule('https://statie-calitate-aer.netlify.app/', 'normal')">
         <div class="btn-icon">🌿</div>
         <div class="btn-text">
           <span class="btn-label">Stație Calitate Aer</span>
@@ -249,15 +249,13 @@
   const viewer   = document.getElementById('viewer');
   const frame    = document.getElementById('viewer-frame');
   const landing  = document.getElementById('landing');
-  const title    = document.getElementById('viewer-title');
 
-  function openModule(url, name, size) {
+  function openModule(url, size) {
     frame.className = size;
     frame.src = url;
-    title.textContent = name;
     landing.style.display = 'none';
     viewer.classList.add('active');
-    history.pushState({ module: name }, '', '#' + encodeURIComponent(name));
+    history.pushState({ module: url }, '', '#module');
   }
 
   function closeModule() {
