@@ -1,0 +1,30 @@
+functionsDirectory = "C:\\Users\\Silviu\\Desktop\\SCUTUL URBAN 4.0\\seismicwatch\\netlify\\functions"
+functionsDirectoryOrigin = "config-v1"
+plugins = []
+headers = []
+redirects = []
+
+[build]
+publish = "C:\\Users\\Silviu\\Desktop\\SCUTUL URBAN 4.0\\seismicwatch"
+publishOrigin = "config"
+base = "C:\\Users\\Silviu\\Desktop\\SCUTUL URBAN 4.0\\seismicwatch"
+functions = "C:\\Users\\Silviu\\Desktop\\SCUTUL URBAN 4.0\\seismicwatch\\netlify\\functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"

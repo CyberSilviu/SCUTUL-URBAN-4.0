@@ -3,10 +3,18 @@
   "appName": "Scut Urban 4.0",
   "webDir": "www",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": [
+      "seismicwatch.netlify.app",
+      "statie-calitate-aer.netlify.app",
+      "airquality-76b25-default-rtdb.firebaseio.com",
+      "data.raspberryshake.org",
+      "fonts.googleapis.com",
+      "cdnjs.cloudflare.com"
+    ]
   },
   "android": {
     "allowMixedContent": true,
-    "backgroundColor": "#0b0f1a"
+    "backgroundColor": "#f8fafc"
   }
 }
