@@ -48,18 +48,39 @@ Monitor seismic în timp real pentru România, cu accent pe stația locală **AM
 
 Tablou de bord pentru monitorizarea calității aerului cu senzori fizici locali.
 
+**Hardware utilizat:**
+
+| Componentă | Model | Alimentare | Rol |
+|------------|-------|-----------|-----|
+| **Microcontroller** | Arduino Uno | 5V | Citire senzori, trimitere date seriale |
+| **Computer de bord** | Raspberry Pi 4 | 5V | Procesare date, publicare Firebase via Node-RED |
+| **Senzor particule praf** | GP2Y1014AU0F (Sharp) | 5V | Măsoară concentrația de praf (mg/m³) |
+| **Senzor UV** | GY-8511 (ML8511) | 3.3V | Măsoară radiația UVA și UVB (mW/cm²) |
+| **Senzor gaze** | MICS-5524 (VOC) | 5V | Detectează CO, CH₄, etanol, H₂, NH₃, NO₂ |
+
+**Flux date hardware → cloud:**
+```
+Arduino Uno (citire senzori analogici)
+        ↓ Serial / I²C
+Raspberry Pi 4
+        ↓ Node-RED (flow de procesare și publicare)
+Firebase Realtime Database
+        ↓ fetch JSON (1 secundă)
+Browser / WebView
+```
+
 **Parametri monitorizați:**
 
-| Senzor | Unitate | Limită avertizare |
-|--------|---------|-------------------|
-| Praf (particule) | mg/m³ | > 0.05 |
-| Radiație UV | mW/cm² | > 3.0 |
-| CO – Monoxid carbon | PPM | > 9.0 |
-| CH₄ – Metan | PPM | > 50.0 |
-| Etanol (VOC) | PPM | > 100.0 |
-| H₂ – Hidrogen | PPM | > 100.0 |
-| NH₃ – Amoniac | PPM | > 25.0 |
-| NO₂ – Dioxid azot | PPM | > 0.1 |
+| Senzor | Model | Unitate | Limită avertizare |
+|--------|-------|---------|-------------------|
+| Praf (particule) | GP2Y1014AU0F | mg/m³ | > 0.05 |
+| Radiație UV | GY-8511 | mW/cm² | > 3.0 |
+| CO – Monoxid carbon | MICS-5524 | PPM | > 9.0 |
+| CH₄ – Metan | MICS-5524 | PPM | > 50.0 |
+| Etanol (VOC) | MICS-5524 | PPM | > 100.0 |
+| H₂ – Hidrogen | MICS-5524 | PPM | > 100.0 |
+| NH₃ – Amoniac | MICS-5524 | PPM | > 25.0 |
+| NO₂ – Dioxid azot | MICS-5524 | PPM | > 0.1 |
 
 Date actualizate la fiecare **1 secundă** din Firebase Realtime Database.
 
@@ -94,6 +115,9 @@ Aplicația **Scut Urban 4.0** pentru Android este un wrapper nativ construit cu 
 | **Chart.js** | Graficul seismogramei | Biblioteca pentru vizualizarea semnalului seismic |
 | **RaspberryShake FDSN API** | Date seismice brute | Server care furnizează înregistrările în format miniSEED |
 | **Netlify Functions** | Proxy serverless | Decodifică datele binare miniSEED și rezolvă problema CORS |
+| **Arduino Uno** | Citire senzori | Microcontroller-ul care citește valorile analogice de la senzori |
+| **Raspberry Pi 4** | Procesare și publicare | Computer de bord care primește datele și le trimite în cloud |
+| **Node-RED** | Flow de automatizare | Platformă vizuală care procesează și publică datele în Firebase |
 | **Firebase Realtime Database** | Date calitate aer | Baza de date cloud unde senzorii fizici trimit măsurătorile |
 | **Capacitor v8** | Aplicație Android | Transformă site-ul web într-o aplicație Android `.apk` |
 | **Netlify** | Găzduire web + funcții | Serverul care face modulele accesibile online |
