@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stație Calitate Aer Live</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background-color: #f4f7f6; 
+            color: #333; 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0; 
+        }
+        h1 { color: #2c3e50; margin-bottom: 30px; }
+        .dashboard { 
+            display: flex; 
+            justify-content: center; 
+            gap: 20px; 
+            flex-wrap: wrap; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+            width: 220px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .card h2 { margin: 0; font-size: 1.1rem; color: #7f8c8d; }
+        .value { 
+            font-size: 2.5rem; 
+            font-weight: bold; 
+            margin: 15px 0 5px 0; 
+            transition: color 0.3s;
+        }
+        .unit { font-size: 0.9rem; color: #95a5a6; font-weight: bold; }
+        .reference {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: #bdc3c7;
+            border-top: 1px dashed #ecf0f1;
+            padding-top: 10px;
+        }
+        .time-container { margin-top: 40px; color: #7f8c8d; }
+        #last-time { font-weight: bold; color: #27ae60; }
+        
+        /* Culori de status */
+        .status-good { color: #2ecc71; }   /* Verde */
+        .status-warn { color: #f39c12; }   /* Portocaliu */
+        .status-danger { color: #e74c3c; } /* Rosu */
+    </style>
+</head>
+<body>
+
+    <h1>🌍 Tablou de Bord: Calitatea Aerului</h1>
+
+    <div class="dashboard">
+        <div class="card">
+            <h2>Praf (Particule)</h2>
+            <div class="value" id="val-praf">--</div>
+            <div class="unit">mg/m³</div>
+            <div class="reference">Optim: &lt; 0.05 mg/m³</div>
+        </div>
+        <div class="card">
+            <h2>Radiație UV</h2>
+            <div class="value" id="val-uv">--</div>
+            <div class="unit">mW/cm²</div>
+            <div class="reference">Sigur: &lt; 3.0 mW/cm²</div>
+        </div>
+        <div class="card">
+            <h2>CO (Monoxid Carbon)</h2>
+            <div class="value" id="val-co">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Normal: &lt; 9.0 PPM</div>
+        </div>
+        <div class="card">
+            <h2>CH4 (Metan)</h2>
+            <div class="value" id="val-ch4">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Sigur: &lt; 50.0 PPM</div>
+        </div>
+        <div class="card">
+            <h2>Etanol (VOC)</h2>
+            <div class="value" id="val-etanol">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Normal: &lt; 100.0 PPM</div>
+        </div>
+        <div class="card">
+            <h2>H2 (Hidrogen)</h2>
+            <div class="value" id="val-h2">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Normal: &lt; 100.0 PPM</div>
+        </div>
+        <div class="card">
+            <h2>NH3 (Amoniac)</h2>
+            <div class="value" id="val-nh3">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Sigur: &lt; 25.0 PPM</div>
+        </div>
+        <div class="card">
+            <h2>NO2 (Dioxid Azot)</h2>
+            <div class="value" id="val-no2">--</div>
+            <div class="unit">PPM</div>
+            <div class="reference">Optim: &lt; 0.1 PPM</div>
+        </div>
+    </div>
+
+    <div class="time-container">Ultima citire: <span id="last-time">Se încarcă...</span></div>
+
+    <script>
+        const firebaseUrl = 'https://airquality-76b25-default-rtdb.firebaseio.com/citiri.json?orderBy="$key"&limitToLast=1';
+
+        // Funcție care alege culoarea în funcție de limite
+        function getColorClass(value, warnLimit, dangerLimit) {
+            if (value >= dangerLimit) return 'status-danger';
+            if (value >= warnLimit) return 'status-warn';
+            return 'status-good';
+        }
+
+        function updateElement(id, value, warn, danger) {
+            const el = document.getElementById(id);
+            el.innerText = value;
+            el.className = 'value ' + getColorClass(parseFloat(value), warn, danger);
+        }
+
+        function preiaDateLive() {
+            fetch(firebaseUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if(data) {
+                        const cheie = Object.keys(data)[0];
+                        const d = data[cheie];
+
+                        // Setăm valorile și limitele (Valoare, Limita Avertizare, Limita Pericol)
+                        updateElement('val-praf', d.praf_mg_m3.toFixed(2), 0.05, 0.15);
+                        updateElement('val-uv', d.uv_mw_cm2.toFixed(2), 3.0, 7.0);
+                        updateElement('val-co', d.co_ppm.toFixed(1), 9.0, 50.0);
+                        updateElement('val-ch4', d.ch4_ppm.toFixed(1), 50.0, 1000.0);
+                        updateElement('val-etanol', d.etanol_ppm.toFixed(1), 100.0, 400.0);
+                        updateElement('val-h2', d.h2_ppm.toFixed(1), 100.0, 400.0);
+                        updateElement('val-nh3', d.nh3_ppm.toFixed(1), 25.0, 50.0);
+                        updateElement('val-no2', d.no2_ppm.toFixed(2), 0.1, 0.5);
+                        
+                        document.getElementById('last-time').innerText = d.data_ora;
+                    }
+                })
+                .catch(e => console.error(e));
+        }
+
+        preiaDateLive();
+        // Verificăm datele noi la fiecare secundă
+        setInterval(preiaDateLive, 1000);
+    </script>
+</body>
+</html>

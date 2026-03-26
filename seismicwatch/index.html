@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SeismicWatch — R0B3B Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ═══════════════════════════════════════════
+     TOKENS — LIGHT THEME
+  ═══════════════════════════════════════════ */
+  :root {
+    --bg:        #eef2f7;
+    --surface:   #ffffff;
+    --surface2:  #f4f7fb;
+    --border:    #c8d6e8;
+    --border2:   #adbdd4;
+    --accent:    #1a6fc4;
+    --accent-bg: rgba(26,111,196,.09);
+    --warn:      #b85c0a;
+    --warn-bg:   rgba(184,92,10,.09);
+    --danger:    #b91c1c;
+    --danger-bg: rgba(185,28,28,.09);
+    --safe:      #15703f;
+    --safe-bg:   rgba(21,112,63,.09);
+    --text:      #13202f;
+    --text2:     #3a5068;
+    --muted:     #7089a4;
+    --shadow-sm: 0 1px 3px rgba(15,30,55,.07), 0 1px 2px rgba(15,30,55,.05);
+    --shadow-md: 0 4px 12px rgba(15,30,55,.08), 0 1px 4px rgba(15,30,55,.06);
+    --font-mono: 'Share Tech Mono', monospace;
+    --font-cond: 'Barlow Condensed', sans-serif;
+    --font-body: 'Barlow', sans-serif;
+    --r:  8px;
+    --rs: 5px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  /* subtle dot grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: .5;
+  }
+
+  #app { position: relative; z-index: 1; }
+
+  /* ═══════════════ HEADER ═══════════════ */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 20px;
+    background: rgba(238,242,247,.97);
+    border-bottom: 2px solid var(--border);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--shadow-md);
+  }
+
+  .logo { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .logo-icon {
+    width: 34px; height: 34px; flex-shrink: 0;
+    border: 2px solid var(--accent);
+    border-radius: var(--rs);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-bg);
+    animation: pulse-border 3s infinite;
+  }
+  @keyframes pulse-border {
+    0%,100% { box-shadow: 0 0 0 0 rgba(26,111,196,.35); }
+    50%      { box-shadow: 0 0 0 6px rgba(26,111,196,0); }
+  }
+  .logo-icon svg { width: 18px; height: 18px; stroke: var(--accent); }
+  .logo-text {
+    font-family: var(--font-cond); font-weight: 900;
+    font-size: 1.3rem; letter-spacing: 1.5px; color: var(--text);
+    white-space: nowrap;
+  }
+  .logo-sub {
+    font-family: var(--font-mono); font-size: .58rem;
+    color: var(--muted); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+  #status-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: .68rem;
+    padding: 5px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    background: var(--safe-bg);
+    transition: all .3s;
+    white-space: nowrap;
+  }
+  #status-badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--safe);
+    animation: blink 1.5s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+  #status-badge.loading { background: var(--warn-bg); border-color: var(--border); }
+  #status-badge.loading .dot { background: var(--warn); animation: none; }
+  #status-badge.error   { background: var(--danger-bg); border-color: var(--danger); }
+  #status-badge.error .dot { background: var(--danger); animation: none; }
+
+  #last-update { font-family: var(--font-mono); font-size: .6rem; color: var(--muted); }
+
+  #refresh-btn {
+    background: var(--surface);
+    border: 1.5px solid var(--border2);
+    color: var(--text2); cursor: pointer;
+    padding: 5px 13px; border-radius: var(--rs);
+    font-family: var(--font-cond); font-size: .8rem; letter-spacing: .5px;
+    transition: all .15s; box-shadow: var(--shadow-sm);
+  }
+  #refresh-btn:hover  { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+  #refresh-btn:active { transform: scale(.97); }
+
+  /* ═══════════════ ALERT BANNER ═══════════════ */
+  #alert-banner {
+    display: none;
+    padding: 9px 20px;
+    background: linear-gradient(90deg, var(--danger-bg), transparent);
+    border-bottom: 2px solid var(--danger);
+    font-family: var(--font-mono); font-size: .78rem; color: var(--danger);
+    animation: flash-bg 1.2s infinite;
+  }
+  @keyframes flash-bg { 0%,100%{opacity:1} 50%{opacity:.6} }
+  #alert-banner.show { display: flex; align-items: center; gap: 8px; }
+
+  /* ═══════════════ LAYOUT ═══════════════ */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 14px;
+    padding: 14px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  /* Left column: panels stack vertically */
+  .col-main {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  /* Right column: sidebar panels stack vertically */
+  .col-side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+
+  /* ═══════════════ PANELS ═══════════════ */
+  .panel {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--border);
+    background: var(--surface2);
+  }
+  .panel-title {
+    font-family: var(--font-cond); font-weight: 700;
+    font-size: .85rem; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--accent);
+  }
+  .panel-meta {
+    font-family: var(--font-mono); font-size: .62rem;
+    color: var(--muted); text-align: right;
+    max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .panel-body { padding: 12px 14px; }
+
+  /* ═══════════════ CANVASES ═══════════════ */
+  #waveform-wrap    { position: relative; height: 170px; }
+  #spectrogram-wrap { position: relative; height: 170px; }
+  #waveform-canvas, #spectrogram-canvas { width: 100%; height: 100%; display: block; }
+  #freq-chart-wrap { height: 150px; }
+
+  .freq-axis {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 32px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 2px 4px 2px 0;
+    font-family: var(--font-mono); font-size: .52rem;
+    color: var(--muted); text-align: right;
+  }
+
+  /* ═══════════════ METRICS ═══════════════ */
+  .metrics-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; padding: 12px;
+  }
+  .metric {
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: var(--rs);
+    padding: 9px 11px;
+  }
+  .metric-label {
+    font-family: var(--font-mono); font-size: .57rem;
+    color: var(--muted); letter-spacing: .8px; text-transform: uppercase;
+  }
+  .metric-value {
+    font-family: var(--font-cond); font-size: 1.45rem; font-weight: 700;
+    margin-top: 3px; color: var(--text); transition: color .4s;
+  }
+  .metric-unit { font-family: var(--font-mono); font-size: .57rem; color: var(--muted); }
+  .metric.highlight .metric-value { color: var(--accent); }
+  .metric.warn      .metric-value { color: var(--warn); }
+  .metric.danger    .metric-value { color: var(--danger); }
+
+  /* ═══════════════ STATUS CARD ═══════════════ */
+  #seismic-status {
+    margin: 0 12px 12px;
+    padding: 11px 14px;
+    border-radius: var(--rs);
+    border: 2px solid var(--safe);
+    background: var(--safe-bg);
+    text-align: center; transition: all .5s;
+  }
+  #seismic-status .status-label {
+    font-family: var(--font-cond); font-weight: 900;
+    font-size: 1.05rem; letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--safe); transition: color .5s;
+  }
+  #seismic-status .status-desc {
+    font-size: .72rem; color: var(--text2); margin-top: 3px; line-height: 1.4;
+  }
+  #seismic-status.warn  { border-color: var(--warn);   background: var(--warn-bg); }
+  #seismic-status.warn  .status-label { color: var(--warn); }
+  #seismic-status.alert { border-color: var(--danger);  background: var(--danger-bg); animation: flash-bg 1.2s infinite; }
+  #seismic-status.alert .status-label { color: var(--danger); }
+
+  /* ═══════════════ FREQ BANDS ═══════════════ */
+  .freq-bands { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .freq-band-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .freq-band-name  { font-family: var(--font-mono); font-size: .62rem; color: var(--text2); }
+  .freq-band-value { font-family: var(--font-mono); font-size: .62rem; color: var(--accent); font-weight: bold; }
+  .freq-bar-bg { background: var(--border); border-radius: 3px; height: 6px; overflow: hidden; }
+  .freq-bar    { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .freq-bar.infra  { background: linear-gradient(90deg,#7c4dff,#b388ff); }
+  .freq-bar.low    { background: linear-gradient(90deg,#1a6fc4,#60a5fa); }
+  .freq-bar.mid    { background: linear-gradient(90deg,#0891b2,#22d3ee); }
+  .freq-bar.high   { background: linear-gradient(90deg,#15703f,#4ade80); }
+  .freq-bar.vhigh  { background: linear-gradient(90deg,#b85c0a,#fb923c); }
+
+  /* ═══════════════ HISTORY ═══════════════ */
+  .history-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .history-item:hover { background: var(--surface2); }
+  .history-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .history-info { flex: 1; min-width: 0; }
+  .history-time  { font-family: var(--font-mono); font-size: .62rem; color: var(--muted); }
+  .history-event { font-family: var(--font-cond); font-size: .85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-amp   { font-family: var(--font-mono); font-size: .62rem; color: var(--muted); }
+  .ev-safe   { color: var(--safe); }
+  .ev-warn   { color: var(--warn); }
+  .ev-danger { color: var(--danger); }
+
+  #history-panel .panel-body { padding: 0; max-height: 260px; overflow-y: auto; }
+
+  /* ═══════════════ CLASSIFICATION ═══════════════ */
+  .classif-row { display: flex; align-items: center; gap: 8px; }
+  .classif-key { font-family: var(--font-mono); font-size: .6rem; color: var(--muted); width: 76px; flex-shrink: 0; }
+  .classif-bar-bg { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .classif-bar { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .classif-pct { font-family: var(--font-mono); font-size: .6rem; color: var(--text2); width: 26px; text-align: right; }
+
+  /* ═══════════════ INFO ROW ═══════════════ */
+  .info-row {
+    display: flex; gap: 5px; flex-wrap: wrap;
+    padding: 7px 14px;
+    border-top: 2px solid var(--border);
+    background: var(--surface2);
+  }
+  .info-tag {
+    font-family: var(--font-mono); font-size: .58rem; color: var(--muted);
+    background: var(--surface); border: 1.5px solid var(--border);
+    padding: 2px 7px; border-radius: 3px;
+  }
+
+  /* ═══════════════ SCROLLBAR ═══════════════ */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--surface2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ═══════════════ LOADING ═══════════════ */
+  #loading-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; z-index: 999; transition: opacity .5s;
+  }
+  #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+  .loading-logo { font-family: var(--font-cond); font-weight: 900; font-size: 2rem; letter-spacing: 3px; color: var(--accent); }
+  .loading-sub  { font-family: var(--font-mono); font-size: .7rem; color: var(--muted); letter-spacing: 1px; text-align: center; padding: 0 24px; }
+  .loading-bar-bg { width: 220px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .loading-bar    { height: 100%; width: 0%; background: var(--accent); animation: load-progress 2.5s ease forwards; }
+  @keyframes load-progress { to { width: 100%; } }
+
+  canvas { image-rendering: pixelated; }
+
+  /* ═══════════════ MOBILE — single column scroll ═══════════════ */
+  @media (max-width: 700px) {
+    header { padding: 10px 14px; }
+    .logo-sub  { display: none; }
+    .logo-text { font-size: 1.05rem; }
+    .logo-icon { width: 28px; height: 28px; }
+    .logo-icon svg { width: 15px; height: 15px; }
+    #last-update { display: none; }
+    #refresh-btn { padding: 5px 10px; font-size: .72rem; }
+    #status-badge { padding: 4px 9px; font-size: .62rem; }
+
+    main {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding: 10px 12px 24px;
+    }
+
+    .col-side { gap: 10px; }
+    .col-main { gap: 10px; }
+
+    #waveform-wrap    { height: 140px; }
+    #spectrogram-wrap { height: 130px; }
+    #freq-chart-wrap  { height: 130px; }
+
+    .metrics-grid { gap: 7px; padding: 10px; }
+    .metric { padding: 8px 10px; }
+    .metric-value { font-size: 1.2rem; }
+
+    #seismic-status { margin: 0 10px 10px; padding: 10px 12px; }
+    .freq-bands { padding: 0 10px 10px; gap: 7px; }
+    .panel-header { padding: 9px 12px; }
+    .panel-title { font-size: .78rem; }
+    .info-row { padding: 6px 12px; }
+    .info-tag { font-size: .54rem; }
+
+    #history-panel .panel-body { max-height: 200px; }
+  }
+
+  @media (max-width: 380px) {
+    main { padding: 8px 8px 20px; gap: 8px; }
+    .metric-value { font-size: 1.05rem; }
+    #waveform-wrap { height: 120px; }
+  }
+
+  /* ═══════════════ DESKTOP — panouri stânga umple întreaga înălțime ═══════════════ */
+  @media (min-width: 701px) {
+    main {
+      align-items: stretch;
+      /* interpretation panel: coloana dreapta sus; col-main: stânga întreagă; col-side: dreapta jos */
+      grid-template-areas: "main interp" "main side";
+    }
+    #interpretation-panel { grid-area: interp; align-self: start; }
+    .col-main              { grid-area: main; }
+    .col-side              { grid-area: side; }
+
+    /* Fiecare panel din coloana stângă devine flex-column și crește proporțional */
+    .col-main > .panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    #waveform-panel    { flex: 1.25; }
+    #spectrogram-panel { flex: 1.0; }
+    #freq-panel        { flex: 0.85; }
+
+    /* Panel-body crește să umple spațiul rămas în panel */
+    .col-main > .panel > .panel-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Canvas-urile cresc cu panel-ul */
+    #waveform-wrap    { flex: 1; height: auto; min-height: 120px; }
+    #spectrogram-wrap { flex: 1; height: auto; min-height: 120px; }
+    #freq-chart-wrap  { flex: 1; height: auto; min-height: 100px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <div class="loading-logo">SEISMICWATCH</div>
+  <div class="loading-sub">SE CONECTEAZĂ LA STAȚIA R0B3B · PAȘCANI, RO</div>
+  <div class="loading-bar-bg"><div class="loading-bar"></div></div>
+</div>
+
+<div id="app">
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round">
+          <polyline points="2,12 6,8 9,14 12,6 15,16 18,10 22,12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">SEISMICWATCH</div>
+        <div class="logo-sub">COLEGIUL TEHNIC DE CĂI FERATE "UNIREA" · STAȚIA AM.R0B3B.00.EHZ</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="last-update">—</div>
+      <div id="status-badge" class="loading">
+        <div class="dot"></div>
+        <span id="status-text">SE ÎNCARCĂ</span>
+      </div>
+      <button id="refresh-btn">↺ REFRESH</button>
+    </div>
+  </header>
+
+  <!-- Alert Banner -->
+  <div id="alert-banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <span id="alert-text">—</span>
+  </div>
+
+  <main>
+
+    <!-- Ce se întâmplă acum — primul pe mobil / coloana dreapta-sus pe desktop -->
+    <div class="panel" id="interpretation-panel" style="border-left:4px solid var(--safe);">
+      <div class="panel-header">
+        <span class="panel-title">🧠 Ce se întâmplă acum?</span>
+        <span class="panel-meta" id="interp-time">–</span>
+      </div>
+      <div id="interp-status-bar" style="display:flex; align-items:center; gap:9px; padding:9px 14px; border-bottom:1px solid var(--border); background:var(--safe-bg);">
+        <div id="interp-dot" style="width:10px; height:10px; border-radius:50%; background:var(--safe); flex-shrink:0; transition:background .4s;"></div>
+        <div id="interp-headline" style="font-family:var(--font-cond); font-weight:700; font-size:.88rem; letter-spacing:1.5px; color:var(--safe); text-transform:uppercase; transition:color .4s;">ACTIVITATE NORMALĂ</div>
+      </div>
+      <div class="panel-body" style="padding:12px 14px;">
+        <p id="interp-text" style="font-family:var(--font-body); font-size:.87rem; line-height:1.65; color:var(--text); margin:0;">
+          Se analizează datele seismice...
+        </p>
+        <div id="richter-box" style="display:none; margin-top:11px; padding:11px 13px; background:var(--surface2); border:1.5px solid var(--border); border-radius:var(--rs);">
+          <div style="font-family:var(--font-mono); font-size:.58rem; color:var(--muted); letter-spacing:.8px; margin-bottom:6px;">ESTIMARE MAGNITUDINE RICHTER</div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div id="richter-value" style="font-family:var(--font-cond); font-weight:900; font-size:2rem; line-height:1; color:var(--danger);">M?</div>
+            <div>
+              <div id="richter-class" style="font-family:var(--font-cond); font-weight:700; font-size:.9rem; letter-spacing:1px; color:var(--text2);">–</div>
+              <div id="richter-advice" style="font-family:var(--font-body); font-size:.75rem; color:var(--text2); margin-top:2px;"></div>
+            </div>
+          </div>
+          <div style="font-family:var(--font-mono); font-size:.55rem; color:var(--muted); margin-top:9px; line-height:1.5; border-top:1px solid var(--border); padding-top:7px;">* ESTIMARE APROXIMATIVĂ ±1–2 TREPTE — fără calibrare senzor și distanță exactă, eroarea este mare. Verificați întotdeauna <strong>infp.ro</strong> pentru magnitudinea oficială.</div>
+        </div>
+        <div id="interp-action" style="display:none; margin-top:10px; padding:9px 11px; border-radius:var(--rs); border:1.5px solid var(--warn); background:var(--warn-bg);">
+          <div id="interp-action-label" style="font-family:var(--font-mono); font-size:.58rem; letter-spacing:.8px; margin-bottom:4px; color:var(--warn);">CE TREBUIE SĂ FACI</div>
+          <div id="interp-action-text" style="font-family:var(--font-body); font-size:.8rem; color:var(--text); line-height:1.5;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LEFT COLUMN ═══ -->
+    <div class="col-main">
+
+      <!-- Waveform -->
+      <div class="panel" id="waveform-panel">
+        <div class="panel-header">
+          <span class="panel-title">⚡ Waveform · EHZ Vertical</span>
+          <span class="panel-meta" id="waveform-meta">–</span>
+        </div>
+        <div class="panel-body" style="padding:10px 14px;">
+          <div id="waveform-wrap">
+            <canvas id="waveform-canvas"></canvas>
+          </div>
+        </div>
+        <div class="info-row">
+          <span class="info-tag">GEOFON VERTICAL</span>
+          <span class="info-tag">100 SPS</span>
+          <span class="info-tag" id="sample-count">– EȘANTIOANE</span>
+          <span class="info-tag" id="waveform-range">AMPLITUDINE: –</span>
+        </div>
+      </div>
+
+      <!-- Spectrogram -->
+      <div class="panel" id="spectrogram-panel">
+        <div class="panel-header">
+          <span class="panel-title">🎨 Spectrogramă · 0–25 Hz</span>
+          <span class="panel-meta">timp → &nbsp;/&nbsp; frecvență ↑</span>
+        </div>
+        <div class="panel-body" style="padding:10px 14px;">
+          <div id="spectrogram-wrap">
+            <div class="freq-axis" id="freq-axis">
+              <span>25Hz</span><span>20Hz</span><span>15Hz</span>
+              <span>10Hz</span><span>5Hz</span><span>1Hz</span><span>0</span>
+            </div>
+            <canvas id="spectrogram-canvas" style="margin-left:34px; width:calc(100% - 34px);"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- FFT Chart -->
+      <div class="panel" id="freq-panel">
+        <div class="panel-header">
+          <span class="panel-title">📊 Analiză Frecvențe (FFT)</span>
+          <span class="panel-meta" id="dom-freq">FRECVENȚĂ DOMINANTĂ: –</span>
+        </div>
+        <div class="panel-body" style="padding:10px 14px;">
+          <div id="freq-chart-wrap">
+            <canvas id="freq-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-main -->
+
+    <!-- ═══ RIGHT COLUMN (SIDEBAR) ═══ -->
+    <div class="col-side sidebar">
+
+      <!-- Live Metrics -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📡 Metrici Live</span>
+          <span class="panel-meta" id="window-info">–</span>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric" id="m-amp">
+            <div class="metric-label">AMP MAX</div>
+            <div class="metric-value" id="mv-amp">–</div>
+            <div class="metric-unit">COUNTS</div>
+          </div>
+          <div class="metric" id="m-rms">
+            <div class="metric-label">RMS</div>
+            <div class="metric-value" id="mv-rms">–</div>
+            <div class="metric-unit">COUNTS</div>
+          </div>
+          <div class="metric highlight" id="m-freq">
+            <div class="metric-label">FREQ DOM.</div>
+            <div class="metric-value" id="mv-freq">–</div>
+            <div class="metric-unit">Hz</div>
+          </div>
+          <div class="metric" id="m-snr">
+            <div class="metric-label">SNR</div>
+            <div class="metric-value" id="mv-snr">–</div>
+            <div class="metric-unit">dB</div>
+          </div>
+        </div>
+        <div id="seismic-status">
+          <div class="status-label" id="status-label">CALM</div>
+          <div class="status-desc" id="status-desc">Activitate seismică normală</div>
+        </div>
+      </div>
+
+      <!-- Freq Bands -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🎯 Benzi de Frecvență</span>
+        </div>
+        <div class="freq-bands">
+          <div class="freq-band">
+            <div class="freq-band-header">
+              <span class="freq-band-name">INFRA (&lt;1 Hz)</span>
+              <span class="freq-band-value" id="fb-infra">0%</span>
+            </div>
+            <div class="freq-bar-bg"><div class="freq-bar infra" id="fb-bar-infra" style="width:0%"></div></div>
+          </div>
+          <div class="freq-band">
+            <div class="freq-band-header">
+              <span class="freq-band-name">JOS (1–5 Hz) — Cutremure</span>
+              <span class="freq-band-value" id="fb-low">0%</span>
+            </div>
+            <div class="freq-bar-bg"><div class="freq-bar low" id="fb-bar-low" style="width:0%"></div></div>
+          </div>
+          <div class="freq-band">
+            <div class="freq-band-header">
+              <span class="freq-band-name">MEDIU (5–10 Hz)</span>
+              <span class="freq-band-value" id="fb-mid">0%</span>
+            </div>
+            <div class="freq-bar-bg"><div class="freq-bar mid" id="fb-bar-mid" style="width:0%"></div></div>
+          </div>
+          <div class="freq-band">
+            <div class="freq-band-header">
+              <span class="freq-band-name">ÎNALT (10–20 Hz) — Trafic</span>
+              <span class="freq-band-value" id="fb-high">0%</span>
+            </div>
+            <div class="freq-bar-bg"><div class="freq-bar high" id="fb-bar-high" style="width:0%"></div></div>
+          </div>
+          <div class="freq-band">
+            <div class="freq-band-header">
+              <span class="freq-band-name">F. ÎNALT (&gt;20 Hz) — Industrial</span>
+              <span class="freq-band-value" id="fb-vhigh">0%</span>
+            </div>
+            <div class="freq-bar-bg"><div class="freq-bar vhigh" id="fb-bar-vhigh" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Source Classification -->
+      <div class="panel" id="classification-panel">
+        <div class="panel-header">
+          <span class="panel-title">🔬 Clasificare Sursă</span>
+          <span class="panel-meta" id="classif-conf">–</span>
+        </div>
+        <div class="panel-body" style="padding:12px 14px;">
+          <div id="classif-result" style="text-align:center; padding:6px 0 10px;">
+            <div id="classif-icon" style="font-size:1.8rem; margin-bottom:5px;">–</div>
+            <div id="classif-label" style="font-family:var(--font-cond); font-weight:900; font-size:1rem; letter-spacing:2px; color:var(--muted);">SE ANALIZEAZĂ</div>
+            <div id="classif-desc" style="font-family:var(--font-mono); font-size:.62rem; color:var(--muted); margin-top:4px; line-height:1.4;">–</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:6px;" id="classif-details">
+            <div class="classif-row">
+              <span class="classif-key">Seismic</span>
+              <div class="classif-bar-bg"><div class="classif-bar" id="cb-seismic" style="width:0%; background:var(--safe)"></div></div>
+              <span class="classif-pct" id="cp-seismic">0%</span>
+            </div>
+            <div class="classif-row">
+              <span class="classif-key">Trafic</span>
+              <div class="classif-bar-bg"><div class="classif-bar" id="cb-traffic" style="width:0%; background:var(--warn)"></div></div>
+              <span class="classif-pct" id="cp-traffic">0%</span>
+            </div>
+            <div class="classif-row">
+              <span class="classif-key">Industrial</span>
+              <div class="classif-bar-bg"><div class="classif-bar" id="cb-industrial" style="width:0%; background:var(--muted)"></div></div>
+              <span class="classif-pct" id="cp-industrial">0%</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px;">
+              <div class="metric" style="padding:7px 10px;">
+                <div class="metric-label">CREȘTERE</div>
+                <div class="metric-value" id="cv-rise" style="font-size:1.1rem">–</div>
+                <div class="metric-unit">sec</div>
+              </div>
+              <div class="metric" style="padding:7px 10px;">
+                <div class="metric-label">DURATĂ</div>
+                <div class="metric-value" id="cv-duration" style="font-size:1.1rem">–</div>
+                <div class="metric-unit">sec</div>
+              </div>
+              <div class="metric" style="padding:7px 10px;">
+                <div class="metric-label">CODA</div>
+                <div class="metric-value" id="cv-coda" style="font-size:1.1rem">–</div>
+                <div class="metric-unit">ratio</div>
+              </div>
+              <div class="metric" style="padding:7px 10px;">
+                <div class="metric-label">STA/LTA</div>
+                <div class="metric-value" id="cv-staltatop" style="font-size:1.1rem">–</div>
+                <div class="metric-unit">max</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:10px; padding:8px 10px; background:var(--surface2); border:1.5px solid var(--border); border-radius:var(--rs);">
+            <div style="font-family:var(--font-mono); font-size:.58rem; color:var(--muted); margin-bottom:5px; letter-spacing:.8px;">LEGENDĂ WAVEFORM</div>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+              <span style="font-family:var(--font-mono); font-size:.62rem; display:flex; align-items:center; gap:5px;">
+                <span style="display:inline-block; width:18px; height:2px; background:rgba(26,111,196,.6);"></span> Semnal brut
+              </span>
+              <span style="font-family:var(--font-mono); font-size:.62rem; display:flex; align-items:center; gap:5px;">
+                <span style="display:inline-block; width:18px; height:2px; background:#15703f;"></span> Filtrat 0.5–4 Hz
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Event History -->
+      <div class="panel" id="history-panel">
+        <div class="panel-header">
+          <span class="panel-title">📋 Jurnal Evenimente</span>
+          <span class="panel-meta" id="event-count">0 ev.</span>
+        </div>
+        <div class="panel-body">
+          <div id="history-list">
+            <div style="padding:20px; text-align:center; font-family:var(--font-mono); font-size:.65rem; color:var(--muted);">
+              Niciun eveniment înregistrat
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-side -->
+  </main>
+
+  <!-- Tab Nav (mobile) -->
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════
+const CFG = {
+  network:  'AM',
+  station:  'R0B3B',
+  location: '00',
+  channel:  'EHZ',
+  windowSec: 120,          // 2 min de date per fetch
+  pollIntervalMs: 30000,   // refresh la 30s
+  delayMin: 35,            // T-35min față de acum (buffer sigur)
+  // Praguri alertă (în counts)
+  threshWarn:  15000,
+  threshAlert: 50000,
+};
+
+// ══════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════
+let state = {
+  waveformData: [],
+  filteredData: [],
+  spectrogramHistory: [],
+  fftData: [],
+  events: [],
+  isLoading: false,
+  lastFetch: null,
+  status: 'calm',
+  classification: null,
+};
+
+// ══════════════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════════════
+function fmtTime(d) {
+  return d.toLocaleTimeString('ro-RO', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+function fmtDateTime(d) {
+  return d.toLocaleString('ro-RO', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+function isoUTC(d) {
+  return d.toISOString().replace(/\.\d+Z$/, '');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MINISEED PARSER  (minimal — supports only Data Record type)
+// ══════════════════════════════════════════════════════════════
+function parseMiniSEED(buffer) {
+  const view = new DataView(buffer);
+  let samples = [];
+  let offset = 0;
+  const len = buffer.byteLength;
+
+  while (offset + 48 <= len) {
+    try {
+      // Fixed header: seq(6) + D(1) + space(1) + station(5) + location(2) + channel(3) + network(2)
+      const recLen = detectRecordLength(view, offset, len);
+      if (recLen < 64) break;
+
+      const numSamples   = view.getUint16(offset + 30, false);
+      const sampleFactor = view.getInt16(offset + 32, false);
+      const sampleMult   = view.getInt16(offset + 34, false);
+      const encoding     = view.getUint8(offset + 44);
+      const dataOffset   = view.getUint16(offset + 46, false);
+
+      let sampleRate = 0;
+      if (sampleFactor > 0 && sampleMult > 0) sampleRate = sampleFactor * sampleMult;
+      else if (sampleFactor > 0 && sampleMult < 0) sampleRate = -sampleFactor / sampleMult;
+      else if (sampleFactor < 0 && sampleMult > 0) sampleRate = -sampleMult / sampleFactor;
+      else if (sampleFactor < 0 && sampleMult < 0) sampleRate = 1.0 / (sampleFactor * sampleMult);
+
+      const dataStart = offset + dataOffset;
+
+      if (encoding === 11) {
+        // Steim-2
+        const s = decodeSteim2(view, dataStart, offset + recLen, numSamples);
+        samples = samples.concat(s);
+      } else if (encoding === 10) {
+        // Steim-1
+        const s = decodeSteim1(view, dataStart, offset + recLen, numSamples);
+        samples = samples.concat(s);
+      } else if (encoding === 3) {
+        // 32-bit int
+        for (let i = 0; i < numSamples && dataStart + i*4 + 4 <= offset + recLen; i++) {
+          samples.push(view.getInt32(dataStart + i * 4, false));
+        }
+      } else if (encoding === 1) {
+        // 16-bit int
+        for (let i = 0; i < numSamples && dataStart + i*2 + 2 <= offset + recLen; i++) {
+          samples.push(view.getInt16(dataStart + i * 2, false));
+        }
+      }
+
+      offset += recLen;
+    } catch(e) {
+      break;
+    }
+  }
+
+  return samples;
+}
+
+function detectRecordLength(view, offset, totalLen) {
+  // Try common record lengths: 512, 4096
+  for (const rl of [512, 4096, 256, 1024, 2048, 8192]) {
+    if (offset + rl <= totalLen) return rl;
+  }
+  return 512;
+}
+
+function decodeSteim1(view, start, end, numSamples) {
+  const samples = [];
+  let lastSample = 0;
+  let frameOffset = start;
+
+  while (frameOffset + 64 <= end && samples.length < numSamples) {
+    const ctrl = view.getUint32(frameOffset, false);
+    for (let w = 1; w < 16 && samples.length < numSamples; w++) {
+      const code = (ctrl >>> (30 - w * 2)) & 0x03;
+      const word = view.getInt32(frameOffset + w * 4, false);
+      if (code === 0) continue;
+      else if (code === 1) {
+        for (let b = 3; b >= 0 && samples.length < numSamples; b--) {
+          const diff = (word >> (b * 8)) & 0xff;
+          const sdiff = diff >= 128 ? diff - 256 : diff;
+          lastSample += sdiff;
+          samples.push(lastSample);
+        }
+      } else if (code === 2) {
+        for (let b = 1; b >= 0 && samples.length < numSamples; b--) {
+          const diff = (word >> (b * 16)) & 0xffff;
+          const sdiff = diff >= 32768 ? diff - 65536 : diff;
+          lastSample += sdiff;
+          samples.push(lastSample);
+        }
+      } else if (code === 3) {
+        if (w === 1) lastSample = word;
+        else {
+          lastSample += word;
+        }
+        samples.push(lastSample);
+      }
+    }
+    frameOffset += 64;
+  }
+  return samples;
+}
+
+function decodeSteim2(view, start, end, numSamples) {
+  // Simplified Steim-2 — fallback to Steim-1 logic for robustness
+  return decodeSteim1(view, start, end, numSamples);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FFT  (Cooley-Tukey, radix-2)
+// ══════════════════════════════════════════════════════════════
+function fft(re, im) {
+  const n = re.length;
+  if (n <= 1) return;
+  // bit-reversal
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      [re[i], re[j]] = [re[j], re[i]];
+      [im[i], im[j]] = [im[j], im[i]];
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len;
+    const wRe = Math.cos(ang), wIm = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let curRe = 1, curIm = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const uRe = re[i+j], uIm = im[i+j];
+        const vRe = re[i+j+len/2]*curRe - im[i+j+len/2]*curIm;
+        const vIm = re[i+j+len/2]*curIm + im[i+j+len/2]*curRe;
+        re[i+j]         = uRe + vRe; im[i+j]         = uIm + vIm;
+        re[i+j+len/2]   = uRe - vRe; im[i+j+len/2]   = uIm - vIm;
+        const nr = curRe*wRe - curIm*wIm;
+        curIm = curRe*wIm + curIm*wRe;
+        curRe = nr;
+      }
+    }
+  }
+}
+
+function computeFFT(samples, sampleRate) {
+  const N = nextPow2(Math.min(samples.length, 8192));
+  const re = new Float64Array(N);
+  const im = new Float64Array(N);
+  // Apply Hann window
+  for (let i = 0; i < N; i++) {
+    const w = 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
+    re[i] = (samples[samples.length - N + i] || 0) * w;
+  }
+  fft(re, im);
+  const half = N / 2;
+  const mag = new Float64Array(half);
+  for (let i = 0; i < half; i++) {
+    mag[i] = Math.sqrt(re[i]*re[i] + im[i]*im[i]);
+  }
+  const freqs = new Float64Array(half);
+  for (let i = 0; i < half; i++) freqs[i] = i * sampleRate / N;
+  return { mag, freqs, N };
+}
+
+function nextPow2(n) {
+  let p = 1;
+  while (p < n) p <<= 1;
+  return p;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ══════════════════════════════════════════════════════════════
+async function fetchData() {
+  if (state.isLoading) return;
+  state.isLoading = true;
+  setStatus('loading');
+
+  const endTime   = new Date(Date.now() - CFG.delayMin * 60 * 1000);
+  const startTime = new Date(endTime.getTime() - CFG.windowSec * 1000);
+
+  // Netlify Function — proxy serverside, fara CORS
+  const params = new URLSearchParams({
+    net:   CFG.network,
+    sta:   CFG.station,
+    loc:   CFG.location,
+    cha:   CFG.channel,
+    start: isoUTC(startTime),
+    end:   isoUTC(endTime),
+  });
+  const url = `/.netlify/functions/seismic?${params}`;
+
+  document.getElementById('window-info').textContent =
+    `${fmtTime(startTime)} – ${fmtTime(endTime)}`;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      throw new Error(`HTTP ${resp.status}${errText ? ': ' + errText : ''}`);
+    }
+
+    // Netlify Function returneaza JSON cu samples deja decodate serverside
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    if (!data.samples || data.samples.length === 0) throw new Error('No samples decoded');
+
+    const samples        = data.samples;
+    const filteredSamples = data.filtered || [];
+    const sampleRate     = data.sampleRate || (samples.length / CFG.windowSec);
+    const classification = data.classification || null;
+
+    state.waveformData    = samples;
+    state.filteredData    = filteredSamples;
+    state.classification  = classification;
+    state.lastFetch       = new Date();
+
+    // FFT pe semnal brut — pentru benzi de frecventa, spectrograma, freq dominanta
+    const { mag: magRaw, freqs } = computeFFT(samples, sampleRate);
+    // FFT pe semnal filtrat 0.5-4Hz — pentru graficul FFT afisat
+    const { mag: magFilt } = computeFFT(filteredSamples.length ? filteredSamples : samples, sampleRate);
+    state.fftData = { mag: magRaw, freqs };
+
+    analyzeAndUpdate(samples, filteredSamples, magRaw, magFilt, freqs, sampleRate, classification, startTime, endTime);
+    setStatus('ok');
+  } catch(err) {
+    console.error('Fetch error:', err);
+    setStatus('error', err.message);
+  }
+
+  state.isLoading = false;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ANALYSIS & UI UPDATE
+// ══════════════════════════════════════════════════════════════
+function analyzeAndUpdate(samples, filtered, magRaw, magFilt, freqs, sampleRate, classification, startTime, endTime) {
+  // Basic stats
+  const maxAmp = Math.max(...samples.map(Math.abs));
+  const rms    = Math.sqrt(samples.reduce((a,b) => a + b*b, 0) / samples.length);
+
+  // Dominant frequency — calculat pe semnal brut
+  let domFreqIdx = 0;
+  let domFreqMag = 0;
+  for (let i = 1; i < magRaw.length; i++) {
+    if (magRaw[i] > domFreqMag) { domFreqMag = magRaw[i]; domFreqIdx = i; }
+  }
+  const domFreq = freqs[domFreqIdx];
+
+  // SNR (signal 1-20Hz / noise 0-1Hz) — pe semnal brut
+  let sigPow = 0, noisePow = 0;
+  for (let i = 0; i < magRaw.length; i++) {
+    const f = freqs[i];
+    if (f > 0.5 && f < 20) sigPow   += magRaw[i] * magRaw[i];
+    if (f <= 0.5)           noisePow += magRaw[i] * magRaw[i];
+  }
+  const snr = noisePow > 0 ? 10 * Math.log10(sigPow / noisePow) : 0;
+
+  // Benzi de frecventa — pe semnal brut (include trafic + industrial)
+  let pInfra=0, pLow=0, pMid=0, pHigh=0, pVhigh=0;
+  for (let i = 0; i < magRaw.length; i++) {
+    const f = freqs[i], m = magRaw[i]*magRaw[i];
+    if (f < 1)       pInfra += m;
+    else if (f < 5)  pLow   += m;
+    else if (f < 10) pMid   += m;
+    else if (f < 20) pHigh  += m;
+    else             pVhigh += m;
+  }
+  const total = pInfra + pLow + pMid + pHigh + pVhigh || 1;
+  const bands = {
+    infra: pInfra/total, low: pLow/total,
+    mid: pMid/total, high: pHigh/total, vhigh: pVhigh/total
+  };
+
+  // ── Update metrics
+  const setMetric = (id, val, cls='') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+    const parent = el?.closest('.metric');
+    if (parent && cls) { parent.className = 'metric ' + cls; }
+  };
+
+  setMetric('mv-amp',  maxAmp > 1e6 ? (maxAmp/1e6).toFixed(2)+'M' : Math.round(maxAmp).toLocaleString('ro'));
+  setMetric('mv-rms',  Math.round(rms).toLocaleString('ro'));
+  setMetric('mv-freq', domFreq.toFixed(2), 'highlight');
+  setMetric('mv-snr',  snr.toFixed(1));
+  document.getElementById('dom-freq').textContent =
+    `FRECVENȚĂ DOMINANTĂ: ${domFreq.toFixed(2)} Hz — ${classifyFreq(domFreq)}`;
+
+  document.getElementById('sample-count').textContent = `${samples.length.toLocaleString('ro')} EȘANTIOANE`;
+  document.getElementById('waveform-range').textContent =
+    `AMP: ±${Math.round(maxAmp).toLocaleString('ro')} counts`;
+  document.getElementById('waveform-meta').textContent =
+    `${fmtDateTime(startTime)} → ${fmtDateTime(endTime)}`;
+
+  // Freq bands
+  const setBand = (id, pct) => {
+    const p = Math.round(pct * 100);
+    document.getElementById(`fb-${id}`).textContent = p + '%';
+    document.getElementById(`fb-bar-${id}`).style.width = Math.min(p, 100) + '%';
+  };
+  setBand('infra', bands.infra);
+  setBand('low',   bands.low);
+  setBand('mid',   bands.mid);
+  setBand('high',  bands.high);
+  setBand('vhigh', bands.vhigh);
+
+  // ── Seismic classification
+  const alertLevel = classifyAlert(maxAmp, rms, domFreq, bands, classification);
+  updateAlertUI(alertLevel, maxAmp, domFreq);
+
+  // ── Show source classification
+  updateClassificationUI(classification);
+  updateInterpretationUI(classification, maxAmp, domFreq);
+
+  // ── Log event if notable
+  if (alertLevel !== 'calm') {
+    addHistoryEvent(alertLevel, maxAmp, domFreq, endTime);
+  }
+
+  // ── Draw visuals
+  drawWaveform(samples, filtered);
+  updateSpectrogram(magRaw, freqs);  // spectrograma pe semnal brut
+  drawFFTChart(magFilt, freqs);      // grafic FFT pe semnal filtrat 0.5-4Hz
+}
+
+function classifyFreq(f) {
+  if (f < 1)   return 'Infrasunet / lent';
+  if (f < 3)   return 'Unde seismice tip P/S';
+  if (f < 5)   return 'Cutremur posibil';
+  if (f < 10)  return 'Activitate medie';
+  if (f < 20)  return 'Trafic / mașini';
+  return 'Surse industriale';
+}
+
+function classifyAlert(maxAmp, rms, domFreq, bands, classification) {
+  // Frecventa sub 0.3 Hz = deriva senzor, tilt, presiune atmosferica sau microseismic oceanic.
+  // Cutremurele locale detectabile incep de la ~0.5 Hz. Sub 0.3 Hz NU este cutremur.
+  if (domFreq < 0.3) return 'calm';
+
+  // Dacă clasificatorul serverside a identificat trafic/zgomot => nu alertam
+  if (classification) {
+    if (classification.type === 'traffic' && classification.confidence > 55) return 'calm';
+    if (classification.type === 'noise'   && classification.confidence > 65) return 'calm';
+
+    // Alerta bazata pe scorul complet al clasificatorului
+    if (classification.type === 'earthquake' && classification.confidence >= 65) {
+      return maxAmp > CFG.threshWarn ? 'alert' : 'warn';
+    }
+    if (classification.type === 'possible_earthquake') {
+      return maxAmp > CFG.threshAlert ? 'warn' : 'calm';
+    }
+    // ambient / unknown: verificam doar daca amplitudinea e extrema
+    if (classification.type === 'ambient' || classification.type === 'unknown') {
+      return maxAmp > CFG.threshAlert * 3 ? 'warn' : 'calm';
+    }
+  }
+
+  // Fallback fara clasificare serverside: criterii spectrale de baza
+  const isSeismicFreq = domFreq < 5;
+  const seismicEnergy = bands.low + bands.infra;
+  if (maxAmp > CFG.threshAlert && isSeismicFreq && seismicEnergy > 0.4) return 'alert';
+  if (maxAmp > CFG.threshWarn  && isSeismicFreq && seismicEnergy > 0.5) return 'warn';
+  return 'calm';
+}
+
+function updateAlertUI(level, maxAmp, domFreq) {
+  const statusEl = document.getElementById('seismic-status');
+  const labelEl  = document.getElementById('status-label');
+  const descEl   = document.getElementById('status-desc');
+  const banner   = document.getElementById('alert-banner');
+  const alertTxt = document.getElementById('alert-text');
+
+  const labels = {
+    calm:  ['CALM',     'Activitate seismică normală'],
+    warn:  ['ATENȚIE',  `Amplitudine ridicată: ${Math.round(maxAmp).toLocaleString('ro')} counts @ ${domFreq.toFixed(1)}Hz`],
+    alert: ['ALERTĂ!',  `Posibil cutremur! Amp: ${Math.round(maxAmp).toLocaleString('ro')} counts, Freq: ${domFreq.toFixed(1)}Hz`],
+  };
+
+  const [lbl, desc] = labels[level] || labels.calm;
+  statusEl.className = level === 'calm' ? '' : level;
+  labelEl.textContent = lbl;
+  descEl.textContent  = desc;
+
+  if (level === 'alert') {
+    banner.className = 'show';
+    alertTxt.textContent = `⚠ ${desc} — ${fmtTime(new Date())}`;
+  } else {
+    banner.className = '';
+  }
+
+  state.status = level;
+  const mAmp = document.getElementById('m-amp');
+  if (mAmp) mAmp.className = `metric ${level === 'alert' ? 'danger' : level === 'warn' ? 'warn' : ''}`;
+}
+
+function addHistoryEvent(level, maxAmp, domFreq, time) {
+  // Avoid duplicate events within 60s
+  const lastEv = state.events[0];
+  if (lastEv && (time - lastEv.time) < 60000 && lastEv.level === level) return;
+
+  state.events.unshift({ level, maxAmp, domFreq, time });
+  if (state.events.length > 50) state.events.pop();
+
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  document.getElementById('event-count').textContent = state.events.length + ' ev.';
+
+  if (!state.events.length) {
+    list.innerHTML = `<div style="padding:20px;text-align:center;font-family:var(--font-mono);font-size:.65rem;color:var(--muted);">Niciun eveniment înregistrat</div>`;
+    return;
+  }
+
+  list.innerHTML = state.events.map(ev => {
+    const cls = ev.level === 'alert' ? 'ev-danger' : 'ev-warn';
+    const col = ev.level === 'alert' ? 'var(--danger)' : 'var(--warn)';
+    const lbl = ev.level === 'alert' ? 'ALERTĂ' : 'ATENȚIE';
+    return `<div class="history-item">
+      <div class="history-dot" style="background:${col}"></div>
+      <div class="history-info">
+        <div class="history-time">${fmtDateTime(ev.time)}</div>
+        <div class="history-event ${cls}">${lbl} — ${ev.domFreq.toFixed(1)}Hz</div>
+        <div class="history-amp">Amp: ${Math.round(ev.maxAmp).toLocaleString('ro')} counts</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CLASSIFICATION UI
+// ══════════════════════════════════════════════════════════════
+function updateClassificationUI(c) {
+  if (!c) return;
+  const typeMap = {
+    earthquake:          { icon: '🌍', label: 'CUTREMUR',        color: 'var(--danger)', border: 'var(--danger)' },
+    possible_earthquake: { icon: '⚠️',  label: 'POSIBIL SEISMIC', color: 'var(--warn)',   border: 'var(--warn)'   },
+    traffic:             { icon: '🚗', label: 'TRAFIC / CAMION', color: 'var(--warn)',   border: 'var(--border)' },
+    noise:               { icon: '🏭', label: 'ZGOMOT INDUSTRIAL',color: 'var(--muted)', border: 'var(--border)' },
+    ambient:             { icon: '🌿', label: 'AMBIENT',          color: 'var(--muted)', border: 'var(--border)' },
+    unknown:             { icon: '❓', label: 'NECUNOSCUT',        color: 'var(--muted)', border: 'var(--border)' },
+  };
+
+  const t = typeMap[c.type] || typeMap.unknown;
+  document.getElementById('classif-icon').textContent  = t.icon;
+  document.getElementById('classif-label').textContent = t.label;
+  document.getElementById('classif-label').style.color = t.color;
+
+  // Descriere dinamica din flags
+  const d = c.details || {};
+  const descEl = document.getElementById('classif-desc');
+  if (c.flags && c.flags.length) {
+    descEl.textContent = c.flags.slice(0, 2).join(' · ');
+  } else {
+    const descs = {
+      earthquake: 'Activitate seismică tectonica detectată',
+      possible_earthquake: 'Semnale ambigue — necesită verificare',
+      traffic: `Rise time ${d.riseTimeSec}s, durata ${d.eventDuration}s — vehicul greu`,
+      noise: 'Zgomot de fond / surse industriale',
+      ambient: 'Activitate de fond normală',
+    };
+    descEl.textContent = descs[c.type] || '—';
+  }
+
+  // Scor vizual
+  document.getElementById('classif-conf').textContent =
+    `CONF: ${c.confidence}% · SCOR: ${c.score > 0 ? '+' : ''}${c.score}`;
+
+  const setBar = (id, pct) => {
+    const p = Math.min(Math.max(pct || 0, 0), 100);
+    const bar = document.getElementById(`cb-${id}`);
+    const pct_el = document.getElementById(`cp-${id}`);
+    if (bar) bar.style.width = p + '%';
+    if (pct_el) pct_el.textContent = p + '%';
+  };
+  setBar('seismic',    d.ratioSeismic    || 0);
+  setBar('traffic',    d.ratioTraffic    || 0);
+  setBar('industrial', d.ratioIndustrial || 0);
+
+  const sv = (id, val, suffix='') => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (val !== undefined && val !== null) ? val + suffix : '–';
+  };
+  sv('cv-rise',      d.riseTimeSec,   's');
+  sv('cv-duration',  d.eventDuration, 's');
+  sv('cv-coda',      d.codaRatio);
+  sv('cv-staltatop', d.staLtaMax);
+
+  // Culoare panel status in functie de clasificare
+  const statusEl = document.getElementById('seismic-status');
+  if (c.type === 'traffic' || c.type === 'noise') {
+    statusEl.style.borderColor = 'var(--border2)';
+    statusEl.style.background  = 'var(--surface2)';
+    document.getElementById('status-label').style.color = 'var(--text2)';
+  } else {
+    statusEl.style.borderColor = '';
+    statusEl.style.background  = '';
+    document.getElementById('status-label').style.color = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INTERPRETARE PE ÎNȚELESUL TUTUROR + SCARA RICHTER
+// ══════════════════════════════════════════════════════════════
+function estimateRichterFromAmplitude(maxAmp) {
+  // Estimare brută — formula Richter ML necesită sensibilitate senzor + distanță la eveniment.
+  // Fără acestea, folosim log10(counts) cu o constantă empirică conservatoare.
+  // Un senzor Raspberry Shake EHZ are ~1.5e9 counts/(m/s); la distanțe de 50–200 km,
+  // un M3 produce în jur de 20.000–80.000 counts și un M5 produce ~2.000.000 counts.
+  // Constanta -3.5 plasează valorile în zone mai realiste față de măsurătorile INFP.
+  if (maxAmp < 10_000) return null;
+  const mag = Math.log10(maxAmp) - 3.5;
+  return Math.round(Math.max(1.0, Math.min(6.5, mag)) * 10) / 10;
+}
+
+function getRichterInfo(mag) {
+  if (mag < 1.5) return { cls: 'Microseism',     color: 'var(--muted)',  advice: 'Imperceptibil pentru oameni. Fără niciun risc.' };
+  if (mag < 2.5) return { cls: 'Minor',           color: 'var(--accent)', advice: 'Rareori simțit. Niciun risc.' };
+  if (mag < 3.5) return { cls: 'Ușor',            color: 'var(--accent)', advice: 'Poate fi simțit ușor. Fără pericol semnificativ.' };
+  if (mag < 4.5) return { cls: 'Moderat',         color: 'var(--warn)',   advice: 'Simțit de toată lumea. Risc minor pentru structuri fragile.' };
+  if (mag < 5.5) return { cls: 'Puternic',        color: 'var(--danger)', advice: 'Poate cauza daune. Rămâneți calm și urmați procedurile.' };
+  return               { cls: 'Major / Sever',    color: 'var(--danger)', advice: 'Cutremur major! Aplicați imediat procedurile de siguranță.' };
+}
+
+function generateInterpretationText(classification, maxAmp, domFreq) {
+  if (!classification) return 'Stația colectează date seismice. Analiza va fi disponibilă în câteva secunde.';
+
+  // Detectare derivă senzor / saturare ADC — frecventa sub 0.3 Hz sau amplitudine imposibilă
+  if (domFreq < 0.3) {
+    return `Semnalul are o frecvență extrem de joasă (${domFreq.toFixed(2)} Hz), mult sub orice cutremur local sau zgomot de trafic. ` +
+           `Aceasta indică o derivă lentă a senzorului (cauzată de variații de temperatură, vibrații de fundație sau o suprasarcină a senzorului), ` +
+           `nu o activitate seismică reală. Niciun risc.`;
+  }
+  if (maxAmp > 1_500_000_000) {
+    return `Amplitudinea înregistrată (${(maxAmp/1e9).toFixed(2)} mld. counts) depășește capacitatea fizică a senzorului. ` +
+           `Aceasta indică o saturare a convertoarelor analogic-digitale (ADC) sau o eroare de date — nu un cutremur. ` +
+           `Verificați starea senzorului.`;
+  }
+
+  const c = classification;
+  const d = c.details || {};
+  const dur  = d.eventDuration != null ? d.eventDuration.toFixed(0) : '?';
+  const rise = d.riseTimeSec   != null ? d.riseTimeSec.toFixed(1)   : '?';
+  const conf = c.confidence;
+  switch (c.type) {
+    case 'traffic':
+      return `Senzorul a detectat vibrații cauzate de trafic rutier — cel mai probabil un camion sau vehicul greu care a trecut pe stradă. ` +
+             `Semnalul este brusc și scurt (aprox. ${dur} secunde, creștere în ${rise} sec.), exact tiparul unui vehicul în mișcare, nu al unui cutremur. ` +
+             `Nu există niciun risc seismic. Sistemul a identificat sursa cu ${conf}% certitudine și a ignorat aceste vibrații.`;
+    case 'noise':
+      return `Se înregistrează zgomot de fond — posibil utilaje, activitate industrială sau alte surse umane din apropiere. ` +
+             `Semnalul nu prezintă nicio caracteristică seismică. Activitate complet normală.`;
+    case 'ambient':
+      return `Totul este liniștit. Stația înregistrează doar activitatea normală de fond a solului: vibrații minuscule cauzate ` +
+             `de vânt, trafic îndepărtat sau activitate umană generală. Niciun semn de activitate seismică.`;
+    case 'possible_earthquake':
+      return `Stația a detectat semnale cu unele caracteristici seismice: frecvențe joase (${domFreq.toFixed(1)} Hz) și o ` +
+             `durată de ${dur} secunde. Ar putea fi un cutremur mic de fundal sau o vibrație naturală puternică. ` +
+             `Clasificatorul este ${conf}% sigur — situația este monitorizată continuu.`;
+    case 'earthquake':
+      return `⚠ Stația a detectat un eveniment seismic! Semnalul prezintă frecvențe joase (${domFreq.toFixed(1)} Hz), ` +
+             `o creștere graduală de ${rise} secunde și o durată totală de ${dur} secunde — caracteristice undelor P și S ` +
+             `generate de un cutremur. Certitudine clasificator: ${conf}%. Verificați sursa oficială INFP (infp.ro) pentru confirmare.`;
+    default:
+      return 'Se monitorizează activitatea seismică. Datele curente nu prezintă anomalii semnificative.';
+  }
+}
+
+function updateInterpretationUI(classification, maxAmp, domFreq) {
+  const panel      = document.getElementById('interpretation-panel');
+  const textEl     = document.getElementById('interp-text');
+  const timeEl     = document.getElementById('interp-time');
+  const richterBox = document.getElementById('richter-box');
+  const dot        = document.getElementById('interp-dot');
+  const headline   = document.getElementById('interp-headline');
+  const statusBar  = document.getElementById('interp-status-bar');
+  const actionEl   = document.getElementById('interp-action');
+  const actionLbl  = document.getElementById('interp-action-label');
+  const actionTxt  = document.getElementById('interp-action-text');
+
+  if (timeEl) timeEl.textContent = fmtTime(new Date());
+  if (textEl) textEl.textContent = generateInterpretationText(classification, maxAmp, domFreq);
+
+  // ── Stare vizuală + culoare în funcție de clasificare ──
+  const type = classification?.type;
+  let color, bgColor, headlineText, action = null;
+
+  if (domFreq < 0.3 || maxAmp > 1_500_000_000) {
+    color = 'var(--muted)'; bgColor = 'var(--surface2)';
+    headlineText = 'ZGOMOT DE FOND';
+  } else {
+    switch (type) {
+      case 'earthquake':
+        color = 'var(--danger)'; bgColor = 'var(--danger-bg)';
+        headlineText = 'EVENIMENT SEISMIC DETECTAT';
+        action = {
+          label: '⚠ CE TREBUIE SĂ FACI',
+          text: 'Rămâneți calm. Dacă simțiți vibrații puternice: adăpostiți-vă sub o masă solidă sau lângă un perete portant, departe de geamuri. Verificați infp.ro pentru confirmare oficială.',
+          borderColor: 'var(--danger)', bg: 'var(--danger-bg)', labelColor: 'var(--danger)'
+        };
+        break;
+      case 'possible_earthquake':
+        color = 'var(--warn)'; bgColor = 'var(--warn-bg)';
+        headlineText = 'SEMNAL SEISMIC POSIBIL';
+        action = {
+          label: 'CE TREBUIE SĂ FACI',
+          text: 'Monitorizăm situația. Dacă simțiți vibrații neobișnuite, fiți atenți și urmăriți actualizările. Verificați infp.ro pentru date oficiale.',
+          borderColor: 'var(--warn)', bg: 'var(--warn-bg)', labelColor: 'var(--warn)'
+        };
+        break;
+      case 'traffic':
+        color = 'var(--text2)'; bgColor = 'var(--surface2)';
+        headlineText = 'TRAFIC RUTIER — IGNORAT';
+        break;
+      case 'noise':
+        color = 'var(--muted)'; bgColor = 'var(--surface2)';
+        headlineText = 'ZGOMOT DE FOND';
+        break;
+      default:
+        color = 'var(--safe)'; bgColor = 'var(--safe-bg)';
+        headlineText = 'ACTIVITATE NORMALĂ';
+    }
+  }
+
+  // Aplică culorile
+  if (panel)     panel.style.borderLeftColor = color;
+  if (dot)       dot.style.background = color;
+  if (headline)  { headline.textContent = headlineText; headline.style.color = color; }
+  if (statusBar) statusBar.style.background = bgColor;
+
+  // Sfat acțiune
+  if (actionEl && actionTxt && actionLbl) {
+    if (action) {
+      actionLbl.textContent = action.label;
+      actionLbl.style.color = action.labelColor;
+      actionTxt.textContent = action.text;
+      actionEl.style.borderColor = action.borderColor;
+      actionEl.style.background  = action.bg;
+      actionEl.style.display = 'block';
+    } else {
+      actionEl.style.display = 'none';
+    }
+  }
+
+  // Estimare Richter — doar pentru cutremure confirmate, nu pentru "posibil" sau anomalii de senzor
+  const showRichter = type === 'earthquake'
+    && domFreq >= 0.3
+    && maxAmp <= 1_500_000_000;
+  if (richterBox) {
+    if (showRichter) {
+      const mag = estimateRichterFromAmplitude(maxAmp);
+      if (mag !== null) {
+        const info = getRichterInfo(mag);
+        document.getElementById('richter-value').textContent = `M ~${mag.toFixed(1)}`;
+        document.getElementById('richter-value').style.color = info.color;
+        document.getElementById('richter-class').textContent = info.cls;
+        document.getElementById('richter-advice').textContent = info.advice;
+        richterBox.style.display = 'block';
+      } else {
+        richterBox.style.display = 'none';
+      }
+    } else {
+      richterBox.style.display = 'none';
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DRAWING: WAVEFORM
+// ══════════════════════════════════════════════════════════════
+function drawWaveform(samples, filtered) {
+  const wrap   = document.getElementById('waveform-wrap');
+  const canvas = document.getElementById('waveform-canvas');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(160,185,210,.6)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = H * i / 4;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  // Zero line
+  ctx.strokeStyle = 'rgba(0,119,204,.2)';
+  ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
+
+  if (!samples.length) return;
+
+  const maxAbs = Math.max(...samples.map(Math.abs)) || 1;
+  const step   = W / samples.length;
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0,   'rgba(0,119,204,.1)');
+  grad.addColorStop(0.5, 'rgba(0,119,204,.03)');
+  grad.addColorStop(1,   'rgba(0,119,204,.1)');
+
+  // Fill area
+  ctx.beginPath();
+  ctx.moveTo(0, H/2);
+  for (let i = 0; i < samples.length; i++) {
+    const x = i * step;
+    const y = H/2 - (samples[i] / maxAbs) * (H * 0.45);
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(W, H/2);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Waveform line
+  ctx.beginPath();
+  ctx.strokeStyle = '#0077cc';
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = '#0077cc';
+  for (let i = 0; i < samples.length; i++) {
+    const x = i * step;
+    const y = H/2 - (samples[i] / maxAbs) * (H * 0.45);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // ── Filtered signal overlay (0.5–4Hz seismic band)
+  if (filtered && filtered.length > 1) {
+    const fMax = Math.max(...filtered.map(Math.abs)) || 1;
+    ctx.beginPath();
+    ctx.strokeStyle = '#059669';
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 3;
+    ctx.shadowColor = '#059669';
+    ctx.globalAlpha = 0.85;
+    const fstep = W / filtered.length;
+    for (let i = 0; i < filtered.length; i++) {
+      const x = i * fstep;
+      const y = H/2 - (filtered[i] / fMax) * (H * 0.4);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DRAWING: SPECTROGRAM
+// ══════════════════════════════════════════════════════════════
+function updateSpectrogram(mag, freqs) {
+  const maxFreq = 25; // Hz display limit
+  const bins = [];
+
+  // Build frequency bins (0..maxFreq)
+  const nBins = 80;
+  for (let b = 0; b < nBins; b++) {
+    const fLow  = b * maxFreq / nBins;
+    const fHigh = (b+1) * maxFreq / nBins;
+    let power = 0, cnt = 0;
+    for (let i = 0; i < freqs.length; i++) {
+      if (freqs[i] >= fLow && freqs[i] < fHigh) { power += mag[i]; cnt++; }
+    }
+    bins.push(cnt > 0 ? power / cnt : 0);
+  }
+
+  state.spectrogramHistory.push(bins);
+  if (state.spectrogramHistory.length > 200) state.spectrogramHistory.shift();
+
+  drawSpectrogram();
+}
+
+function drawSpectrogram() {
+  const wrap   = document.getElementById('spectrogram-wrap');
+  const canvas = document.getElementById('spectrogram-canvas');
+  const W = wrap.clientWidth - 36;
+  const H = wrap.clientHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const history = state.spectrogramHistory;
+  if (!history.length) return;
+
+  const nCols = history.length;
+  const nBins = history[0].length;
+  const colW  = W / nCols;
+  const rowH  = H / nBins;
+
+  // Find global max for normalization
+  let gMax = 0;
+  for (const col of history) for (const v of col) if (v > gMax) gMax = v;
+  if (gMax === 0) return;
+
+  for (let c = 0; c < nCols; c++) {
+    for (let b = 0; b < nBins; b++) {
+      const norm = history[c][b] / gMax;
+      // Color map: black → purple → blue → cyan → green → yellow → red
+      ctx.fillStyle = spectroColor(norm);
+      const x = c * colW;
+      const y = H - (b + 1) * rowH; // freq 0 at bottom
+      ctx.fillRect(x, y, Math.ceil(colW), Math.ceil(rowH));
+    }
+  }
+}
+
+function spectroColor(t) {
+  // Custom seismic colormap
+  if (t < 0.1) return `rgb(${lrp(0,20,t/0.1)},0,${lrp(0,40,t/0.1)})`;
+  if (t < 0.3) { const u=(t-.1)/.2; return `rgb(${lrp(20,0,u)},${lrp(0,0,u)},${lrp(40,180,u)})`; }
+  if (t < 0.5) { const u=(t-.3)/.2; return `rgb(0,${lrp(0,200,u)},${lrp(180,220,u)})`; }
+  if (t < 0.7) { const u=(t-.5)/.2; return `rgb(0,${lrp(200,240,u)},${lrp(220,0,u)})`; }
+  if (t < 0.9) { const u=(t-.7)/.2; return `rgb(${lrp(0,255,u)},${lrp(240,200,u)},0)`; }
+  const u=(t-.9)/.1; return `rgb(255,${lrp(200,0,u)},0)`;
+}
+function lrp(a, b, t) { return Math.round(a + (b - a) * Math.max(0, Math.min(1, t))); }
+
+// ══════════════════════════════════════════════════════════════
+//  DRAWING: FFT CHART (Chart.js)
+// ══════════════════════════════════════════════════════════════
+let fftChart = null;
+
+function drawFFTChart(mag, freqs) {
+  const maxFreq = 25;
+  const labels = [], data = [];
+
+  // Downsample to ~200 points for display
+  const step = Math.max(1, Math.floor(freqs.length / 200));
+  for (let i = 0; i < freqs.length; i += step) {
+    if (freqs[i] > maxFreq) break;
+    labels.push(freqs[i].toFixed(1));
+    data.push(mag[i]);
+  }
+
+  const ctx = document.getElementById('freq-chart').getContext('2d');
+
+  if (fftChart) {
+    fftChart.data.labels = labels;
+    fftChart.data.datasets[0].data = data;
+    fftChart.update('none');
+    return;
+  }
+
+  fftChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#0077cc',
+        backgroundColor: 'rgba(0,119,204,.08)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: true,
+        tension: 0.2,
+      }]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => `${Number(ctx.parsed.y).toFixed(0)} | ${ctx.label}Hz` }
+      }},
+      scales: {
+        x: {
+          ticks: { color: '#6b7f96', font: { family: 'Share Tech Mono', size: 9 },
+                   maxTicksLimit: 12,
+                   callback: (v, i, arr) => labels[i] ? labels[i]+'Hz' : '' },
+          grid: { color: 'rgba(180,200,220,.7)' },
+          border: { color: '#d1dce8' }
+        },
+        y: {
+          ticks: { color: '#6b7f96', font: { family: 'Share Tech Mono', size: 9 } },
+          grid: { color: 'rgba(180,200,220,.7)' },
+          border: { color: '#d1dce8' }
+        }
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STATUS UI
+// ══════════════════════════════════════════════════════════════
+function setStatus(type, msg) {
+  const badge    = document.getElementById('status-badge');
+  const txt      = document.getElementById('status-text');
+  const upd      = document.getElementById('last-update');
+
+  const map = {
+    loading: ['loading', 'SE ACTUALIZEAZĂ'],
+    ok:      ['',        'LIVE · T-35min'],
+    error:   ['error',   'EROARE FETCH'],
+  };
+  const [cls, label] = map[type] || ['', type];
+  badge.className = cls ? `${cls}` : '';
+  txt.textContent  = label;
+  if (type === 'ok' && state.lastFetch) {
+    upd.textContent = 'ACTUALIZAT: ' + fmtTime(state.lastFetch);
+  } else if (type === 'error') {
+    upd.textContent = msg || '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RESIZE
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('resize', () => {
+  if (state.waveformData.length) drawWaveform(state.waveformData);
+  if (state.spectrogramHistory.length) drawSpectrogram();
+});
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+document.getElementById('refresh-btn').addEventListener('click', fetchData);
+
+setTimeout(() => {
+  document.getElementById('loading-overlay').classList.add('hidden');
+  fetchData();
+}, 2600);
+
+setInterval(fetchData, CFG.pollIntervalMs);
+
+// On resize: redraw canvases
+window.addEventListener('resize', () => {
+  if (state.waveformData.length) drawWaveform(state.waveformData, state.filteredData);
+  if (state.spectrogramHistory.length) drawSpectrogram();
+});
+</script>
+</body>
+</html>

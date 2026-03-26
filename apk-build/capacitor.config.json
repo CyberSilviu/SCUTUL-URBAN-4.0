@@ -1,0 +1,12 @@
+{
+  "appId": "ro.scutulurban.app",
+  "appName": "Scut Urban 4.0",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0b0f1a"
+  }
+}
